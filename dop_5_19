@@ -1,0 +1,240 @@
+create or replace PROCEDURE find_user_depend AUTHID CURRENT_USER IS
+--------------------------------------------------------------------------------
+v_id NUMBER;--id объекта, который анализируем на предмет зависимостей
+i NUMBER:=0;--используется при поиске для перемещения по i_pass_obj_table
+v_i NUMBER:=0;--используется при выводе зависимостей (i_indir_dep_table)
+v_counter NUMBER:=0;--счётчик выведенных зависимостей
+--------------------------------------------------------------------------------
+TYPE obj_info_type IS RECORD--запись для хранения информации об объектах
+(v_object_id user_objects.object_id%TYPE,
+ v_object_name user_objects.object_name%TYPE,
+ v_object_type user_objects.object_type%TYPE);
+TYPE i_obj_type IS TABLE OF obj_info_type
+INDEX BY PLS_INTEGER;
+i_obj_table i_obj_type;--индексная таблица, содержащая object_id,
+                       --object_name, object_type об объектах из user_objects
+--------------------------------------------------------------------------------
+TYPE all_obj_info_type IS RECORD--запись для хранения информации об объектах
+(v_object_id all_objects.object_id%TYPE,
+ v_object_name all_objects.object_name%TYPE,
+ v_object_type all_objects.object_type%TYPE);
+ TYPE i_all_obj_type IS TABLE OF all_obj_info_type
+ INDEX BY PLS_INTEGER;
+ i_all_obj_table i_all_obj_type;--индексная таблица, содержащая object_id,
+                          --object_name, object_type об объектах из all_objects
+--------------------------------------------------------------------------------
+TYPE all_obj_id_info_type IS RECORD(v_object_name all_objects.object_name%TYPE,
+                                    v_object_type all_objects.object_type%TYPE);
+TYPE i_all_obj_id_type IS TABLE OF all_obj_id_info_type
+INDEX BY /*PLS_INTEGER*/VARCHAR2(38);
+i_all_obj_id_table i_all_obj_id_type;
+--------------------------------------------------------------------------------
+TYPE dep_type IS TABLE OF public_dependency%ROWTYPE
+INDEX BY PLS_INTEGER;
+i_dir_dep_table dep_type;--индексная таблица, хранящая прямые зависимости по id
+--------------------------------------------------------------------------------
+TYPE indir_dep_info IS TABLE OF VARCHAR2(5000)
+INDEX BY PLS_INTEGER;
+TYPE indir_dep_type IS TABLE OF indir_dep_info
+INDEX BY /*PLS_INTEGER*/VARCHAR2(38);
+i_indir_dep_table indir_dep_type;--индексная таблица, хранящая все зависимости
+--------------------------------------------------------------------------------
+--индексная табличка с referenced_objects, для исследуемого,
+--заполняющаяся в процессе выполнения подпрограммы
+TYPE i_pass_obj_type IS TABLE OF NUMBER
+INDEX BY PLS_INTEGER;
+i_pass_obj_table i_pass_obj_type;
+------------------------local subprogram(start)---------------------------------
+PROCEDURE search_dir_dep(p_id IN OUT NUMBER,
+                         p_in_table IN dep_type,
+                         p_out_table IN OUT NOCOPY indir_dep_type,
+                         p_pass_table IN OUT NOCOPY i_pass_obj_type,
+                         p_all_obj_table IN i_all_obj_id_type) IS
+                         
+                p_unknown VARCHAR2(60):='НЕИЗВЕСТНЫЙ ОБЪЕКТ № ';
+BEGIN
+    FOR i IN p_in_table.FIRST..p_in_table.LAST
+    LOOP
+                IF p_in_table(i).object_id=p_id THEN
+                   IF p_out_table.EXISTS(p_id) AND NOT p_out_table.EXISTS(p_in_table(i).referenced_object_id) THEN
+
+                                IF p_all_obj_table.EXISTS(p_in_table(i).referenced_object_id) THEN
+
+                                    FOR j IN p_out_table(p_id).FIRST..p_out_table(p_id).LAST
+                                    LOOP
+                                             p_out_table(p_in_table(i).referenced_object_id)(j):=p_out_table(p_id)(j)||
+                                             ' зависит от '||/*p_in_table(i).referenced_object_id*/
+                                             p_all_obj_table(p_in_table(i).referenced_object_id).v_object_name||
+                                             ' '||p_all_obj_table(p_in_table(i).referenced_object_id).v_object_type;
+                                    END LOOP;
+                        
+                                ELSE
+                       
+                                   FOR j IN p_out_table(p_id).FIRST..p_out_table(p_id).LAST
+                                   LOOP
+                                            p_out_table(p_in_table(i).referenced_object_id)(j):=p_out_table(p_id)(j)||
+                                            ' зависит от '||p_unknown||p_in_table(i).referenced_object_id;
+                                   END LOOP;
+                            
+                                END IF;
+                      --|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|--
+                         p_pass_table(p_pass_table.LAST+1):=p_in_table(i).referenced_object_id;
+                      --|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|--   
+                   ELSIF p_out_table.EXISTS(p_id) AND p_out_table.EXISTS(p_in_table(i).referenced_object_id) THEN
+                    
+                        IF p_all_obj_table.EXISTS(p_in_table(i).referenced_object_id) THEN
+                     
+                              FOR j IN p_out_table(p_id).FIRST..p_out_table(p_id).LAST
+                              LOOP
+                                       p_out_table(p_in_table(i).referenced_object_id)(p_out_table(p_in_table(i).referenced_object_id).LAST+1):=
+                                       p_out_table(p_id)(j)||' зависит от '||/*p_in_table(i).referenced_object_id*/p_all_obj_table(p_in_table(i).referenced_object_id).v_object_name||
+                                       ' '||p_all_obj_table(p_in_table(i).referenced_object_id).v_object_type;
+                              END LOOP;   
+                        
+                        ELSE
+                       
+                              FOR j IN p_out_table(p_id).FIRST..p_out_table(p_id).LAST
+                              LOOP
+                                      p_out_table(p_in_table(i).referenced_object_id)(p_out_table(p_in_table(i).referenced_object_id).LAST+1):=
+                                      p_out_table(p_id)(j)||' зависит от '||p_unknown||p_in_table(i).referenced_object_id;
+                              END LOOP;
+                        
+                        END IF;
+                         
+                   ELSE
+                      
+                            IF p_all_obj_table.EXISTS(p_in_table(i).referenced_object_id) THEN
+                         
+                               p_out_table(p_in_table(i).referenced_object_id)(1):=/*p_id*/p_all_obj_table(p_id).v_object_name||
+                               ' '||p_all_obj_table(p_id).v_object_type||' зависит от '||/*p_in_table(i).referenced_object_id*/
+                               p_all_obj_table(p_in_table(i).referenced_object_id).v_object_name||
+                               ' '||p_all_obj_table(p_in_table(i).referenced_object_id).v_object_type;
+                            
+                            ELSE
+                          
+                               p_out_table(p_in_table(i).referenced_object_id)(1):=/*p_id*/p_all_obj_table(p_id).v_object_name||
+                               ' '||p_all_obj_table(p_id).v_object_type||' зависит от '||p_unknown||p_in_table(i).referenced_object_id;
+                            
+                            END IF;
+                       --|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|--     
+                            p_pass_table(p_pass_table.LAST+1):=p_in_table(i).referenced_object_id;
+                       --|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|-|--
+                   END IF;
+                END IF;           
+    END LOOP;
+
+END search_dir_dep;
+-------------------------local subprogram(end)----------------------------------
+BEGIN
+---------------заполнение индексной таблицы объектами пользователя--------------
+  SELECT object_id, object_name, object_type BULK COLLECT INTO i_obj_table
+  FROM user_objects;
+--------------------------------------------------------------------------------
+---------------заполнение индексной таблицы используя all objects---------------
+SELECT object_id, object_name, object_type BULK COLLECT INTO i_all_obj_table
+FROM all_objects;
+--------------------------------------------------------------------------------
+--------------заполнение индексной таблицы прямыми зависимостями----------------
+SELECT object_id, referenced_object_id BULK COLLECT INTO i_dir_dep_table
+FROM public_dependency;
+--------------------------------------------------------------------------------
+           IF i_all_obj_table.EXISTS(i_all_obj_table.FIRST) THEN
+                  NULL;
+            ELSE
+                  RAISE collection_is_null;
+            END IF;
+--------------------------------------------------------------------------------
+--перенос содержимого i_all_obj_table в i_all_obj_id_table с индексированием по object_id
+  FOR i IN i_all_obj_table.FIRST..i_all_obj_table.LAST
+  LOOP
+    i_all_obj_id_table(i_all_obj_table(i).v_object_id).v_object_name:=i_all_obj_table(i).v_object_name;
+    i_all_obj_id_table(i_all_obj_table(i).v_object_id).v_object_type:=i_all_obj_table(i).v_object_type;
+  END LOOP;
+--------------------------------------------------------------------------------
+i_pass_obj_table(1):=-1;--начальная строка, чтобы можно было зацепиться с помощью метода LAST в дальнейшем
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+--|||||||||||||||||||||||||||||ПОИСК ЗАВИСИМОСТЕЙ|||||||||||||||||||||||||||||--
+--------------------------------------------------------------------------------
+           IF i_obj_table.EXISTS(i_obj_table.FIRST) THEN
+                  NULL;
+            ELSE
+                  RAISE collection_is_null;
+            END IF;
+--------------------------------------------------------------------------------
+  FOR counter IN i_obj_table.FIRST..i_obj_table.LAST
+  LOOP 
+        v_id:=i_obj_table(counter).v_object_id;
+        search_dir_dep(v_id, i_dir_dep_table, i_indir_dep_table, i_pass_obj_table, i_all_obj_id_table);
+        
+        IF i_pass_obj_table.COUNT!=1 THEN
+        --ЗАПУСКАЕМ ВНУТРЕННИЙ ЦИКЛ--
+                          i:=i_pass_obj_table.FIRST+1;
+                    LOOP
+                          v_id:=i_pass_obj_table(i);
+                          search_dir_dep(v_id, i_dir_dep_table, i_indir_dep_table, i_pass_obj_table, i_all_obj_id_table);
+            
+                          IF i_pass_obj_table.EXISTS(i_pass_obj_table.NEXT(i)) THEN
+                             i:=i_pass_obj_table.NEXT(i);
+                          ELSE
+                             EXIT;
+                          END IF;
+            
+                    END LOOP;
+        --ELSE
+                  /*i_indir_dep_table(v_id)(1):='ДЛЯ '||i_all_obj_id_table(v_id).v_object_name||
+                  ' '||i_all_obj_id_table(v_id).v_object_type||' ЗАВИСИМОСТИ НЕ ОБНАРУЖЕНЫ';*/
+        END IF;
+        
+        i_pass_obj_table.DELETE(i_pass_obj_table.FIRST+1, i_pass_obj_table.LAST);
+  END LOOP;
+--------------------------------------------------------------------------------
+  --||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||--
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+--||||||||||||||||||||||||||||||ВЫВОД ДАННЫХ||||||||||||||||||||||||||||||||||--
+--------------------------------------------------------------------------------
+           IF i_indir_dep_table.EXISTS(i_indir_dep_table.FIRST) THEN
+                  NULL;
+            ELSE
+                  RAISE collection_is_null;
+            END IF;
+--------------------------------------------------------------------------------            
+DBMS_OUTPUT.NEW_LINE;
+DBMS_OUTPUT.PUT_LINE('НЕИЗВЕСТНЫЕ ОБЪЕКТЫ, ЭТО ТЕ КОТОРЫХ НЕТ В ALL_OBJECTS');
+DBMS_OUTPUT.NEW_LINE;
+DBMS_OUTPUT.PUT_LINE('КОЛ-ВО ПОЛЬЗОВАТЕЛЬСКИХ ОБЪЕКТОВ ДЛЯ АНАЛИЗА(i_obj_table): '||i_obj_table.COUNT);
+DBMS_OUTPUT.PUT_LINE('КОЛ-ВО ВСЕХ ОБЪЕКТОВ(i_all_obj_id_table): '||i_all_obj_id_table.COUNT);
+DBMS_OUTPUT.PUT_LINE('КОЛ-ВО ПРЯМЫХ ЗАВИСИМОСТЕЙ(public_dependency[i_dir_dep_table]): '||i_dir_dep_table.COUNT);
+
+-------------------вывод всех элементов, кроме последнего-----------------------  
+  DBMS_OUTPUT.NEW_LINE; 
+  v_i:=i_indir_dep_table.FIRST;
+  WHILE i_indir_dep_table.EXISTS(i_indir_dep_table.NEXT(v_i)) LOOP
+       
+            <<Inner_loop>>
+            FOR i IN i_indir_dep_table(v_i).FIRST..i_indir_dep_table(v_i).LAST LOOP
+                     DBMS_OUTPUT.PUT_LINE(i_indir_dep_table(v_i)(i)/*||' # '||v_i*/);
+                     v_counter:=v_counter+1;
+            END LOOP Inner_loop;
+            
+      v_i:=i_indir_dep_table.NEXT(v_i);
+  END LOOP;
+-------------------вывод содержимого последнего элемента------------------------
+            FOR i IN i_indir_dep_table(v_i).FIRST..i_indir_dep_table(v_i).LAST LOOP    
+                     DBMS_OUTPUT.PUT_LINE(i_indir_dep_table(i_indir_dep_table.LAST)(i)/*||' # '||v_i*/);
+                     v_counter:=v_counter+1;
+            END LOOP Inner_loop;
+--------------------------------------------------------------------------------
+DBMS_OUTPUT.NEW_LINE;
+DBMS_OUTPUT.PUT_LINE('КОЛ-ВО ЗАПИСЕЙ(i_indir_dep_table): '||i_indir_dep_table.COUNT);
+DBMS_OUTPUT.PUT_LINE('КОЛ-ВО ВЫВЕДЕННЫХ СТРОК '||v_counter);
+--------------------------------------------------------------------------------
+--||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||--
+--------------------------------------------------------------------------------
+EXCEPTION
+WHEN collection_is_null THEN
+     DBMS_OUTPUT.PUT_LINE('NO DEPENDENCIES FOR '||USER||' OBJECTS OR NO DATA FROM USERS_OBJECTS OR ALL_OBJECTS');
+END find_user_depend;
