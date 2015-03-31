@@ -1,0 +1,400 @@
+create or replace PACKAGE moving IS
+--public type and variable declarations
+--subprogram specifications
+
+PROCEDURE search(v_start IN OUT points%ROWTYPE,
+                 v_direct IN OUT VARCHAR2,
+                 v_count IN NUMBER);
+END moving;
+
+create or replace PACKAGE BODY moving IS
+--private type and variable declarations
+--subprogram bodies
+
+-------------------local variable declarations----------------------------------
+v_min points%ROWTYPE;  --определение ближайшей точки к текущему местоположению
+--при условии, что движемся на север (N)
+v_cur_i NUMBER:=1;  --индекс для извлечения данных
+                    --из курсора в индексную таблицу
+                    
+TYPE points_table_type IS TABLE OF
+    points%ROWTYPE INDEX BY PLS_INTEGER;
+my_points_table  points_table_type; --индексная таблица с записями
+
+CURSOR c_points_cursor IS
+SELECT *
+FROM points;
+-------------------local variable declarations----------------------------------
+
+PROCEDURE detect_near
+(v_start IN OUT points%ROWTYPE,
+ v_direct IN VARCHAR2,
+ v_check IN OUT BOOLEAN,
+ my_points_table IN OUT points_table_type) IS
+ 
+v_start_point points%ROWTYPE; --стартовая точка
+
+
+
+BEGIN
+v_start_point := v_start;  --указываем стартовую точку
+--------------------------------------------------------------------------------
+IF v_direct='N' THEN
+--------------------------------------------------------------------------------
+
+--------------цикл для захвата любой точки на вертикали-------------------------
+----------------------------кроме её самой--------------------------------------
+----------------------------больше её по Y--------------------------------------
+FOR i IN my_points_table.FIRST..my_points_table.LAST
+LOOP
+IF my_points_table(i).X = v_start_point.X AND my_points_table(i).pid <>
+v_start_point.pid AND my_points_table(i).Y > v_start_point.Y THEN
+v_min := my_points_table(i);
+--DBMS_OUTPUT.PUT_LINE('Номер точки '||v_min.pid);
+v_check := TRUE;  --точка обнаружена
+EXIT;
+ELSE
+v_check := FALSE;
+END IF;
+
+END LOOP;
+IF v_check THEN
+DBMS_OUTPUT.PUT_LINE('переход будет');
+ELSE
+DBMS_OUTPUT.PUT_LINE('перехода НЕ будет');
+END IF;
+--------------------------------------------------------------------------------
+-----------цикл определения БЛИЖАЙШЕЙ точки к текущему положению, при условии,
+--что движемся на север (N)
+FOR i IN my_points_table.FIRST..my_points_table.LAST
+LOOP
+IF my_points_table(i).pid <> v_start_point.pid AND
+my_points_table(i).X = v_start_point.X AND my_points_table(i).Y < v_min.Y AND
+my_points_table(i).Y > v_start_point.Y THEN
+v_min := my_points_table(i);
+END IF;
+END LOOP;
+--------------------------------------------------------------------------------
+IF v_check THEN
+DBMS_OUTPUT.PUT('№ '||v_start_point.pid||' в напр. '||v_direct);
+DBMS_OUTPUT.PUT_LINE(' -> № '||v_min.pid);
+v_start:=v_min;
+ELSE
+DBMS_OUTPUT.PUT_LINE('точек в указаннном направлении не обнаружено');
+END IF;
+
+--------------------------------------------------------------------------------
+ELSIF v_direct='E' THEN
+--------------------------------------------------------------------------------
+--------------цикл для захвата любой точки на горизонтали-----------------------
+----------------------------кроме её самой--------------------------------------
+----------------------------больше её по X--------------------------------------
+FOR i IN my_points_table.FIRST..my_points_table.LAST
+LOOP
+IF my_points_table(i).Y = v_start_point.Y AND my_points_table(i).pid <>
+v_start_point.pid AND my_points_table(i).X > v_start_point.X THEN
+v_min := my_points_table(i);
+--DBMS_OUTPUT.PUT_LINE('Номер точки '||v_min.pid);
+v_check := TRUE;  --точка обнаружена
+EXIT;
+ELSE
+v_check := FALSE;
+END IF;
+
+END LOOP;
+IF v_check THEN
+DBMS_OUTPUT.PUT_LINE('переход будет');
+ELSE
+DBMS_OUTPUT.PUT_LINE('перехода НЕ будет');
+END IF;
+--------------------------------------------------------------------------------
+-----------цикл определения БЛИЖАЙШЕЙ точки к текущему положению, при условии,
+--что движемся на восток (E)
+FOR i IN my_points_table.FIRST..my_points_table.LAST
+LOOP
+IF my_points_table(i).pid <> v_start_point.pid AND
+my_points_table(i).Y = v_start_point.Y AND my_points_table(i).X < v_min.X AND
+my_points_table(i).X > v_start_point.X THEN
+v_min := my_points_table(i);
+END IF;
+END LOOP;
+--------------------------------------------------------------------------------
+IF v_check THEN
+DBMS_OUTPUT.PUT('№ '||v_start_point.pid||' в напр. '||v_direct);
+DBMS_OUTPUT.PUT_LINE(' -> № '||v_min.pid);
+v_start:=v_min;
+ELSE
+DBMS_OUTPUT.PUT_LINE('точек в указаннном направлении не обнаружено');
+END IF;
+--------------------------------------------------------------------------------
+ELSIF v_direct='S' THEN
+--------------------------------------------------------------------------------
+--------------цикл для захвата любой точки на вертикали-------------------------
+----------------------------кроме её самой--------------------------------------
+----------------------------меньше её по Y--------------------------------------
+FOR i IN my_points_table.FIRST..my_points_table.LAST
+LOOP
+IF my_points_table(i).X = v_start_point.X AND my_points_table(i).pid <>
+v_start_point.pid AND my_points_table(i).Y < v_start_point.Y THEN
+v_min := my_points_table(i);
+--DBMS_OUTPUT.PUT_LINE('Номер точки '||v_min.pid);
+v_check := TRUE;  --точка обнаружена
+EXIT;
+ELSE
+v_check := FALSE;
+END IF;
+
+END LOOP;
+IF v_check THEN
+DBMS_OUTPUT.PUT_LINE('переход будет');
+ELSE
+DBMS_OUTPUT.PUT_LINE('перехода НЕ будет');
+END IF;
+--------------------------------------------------------------------------------
+-----------цикл определения БЛИЖАЙШЕЙ точки к текущему положению, при условии,
+--что движемся на юг (S)
+FOR i IN my_points_table.FIRST..my_points_table.LAST
+LOOP
+IF my_points_table(i).pid <> v_start_point.pid AND
+my_points_table(i).X = v_start_point.X AND my_points_table(i).Y > v_min.Y AND
+my_points_table(i).Y < v_start_point.Y THEN
+v_min := my_points_table(i);
+END IF;
+END LOOP;
+--------------------------------------------------------------------------------
+IF v_check THEN
+DBMS_OUTPUT.PUT('№ '||v_start_point.pid||' в напр. '||v_direct);
+DBMS_OUTPUT.PUT_LINE(' -> № '||v_min.pid);
+v_start:=v_min;
+ELSE
+DBMS_OUTPUT.PUT_LINE('точек в указаннном направлении не обнаружено');
+END IF;
+--------------------------------------------------------------------------------
+ELSIF v_direct='W' THEN
+--------------------------------------------------------------------------------
+--------------цикл для захвата любой точки на горизонтали-------------------------
+----------------------------кроме её самой--------------------------------------
+----------------------------меньше её по X--------------------------------------
+FOR i IN my_points_table.FIRST..my_points_table.LAST
+LOOP
+IF my_points_table(i).Y = v_start_point.Y AND my_points_table(i).pid <>
+v_start_point.pid AND my_points_table(i).X < v_start_point.X THEN
+v_min := my_points_table(i);
+--DBMS_OUTPUT.PUT_LINE('Номер точки '||v_min.pid);
+v_check := TRUE;  --точка обнаружена
+EXIT;
+ELSE
+v_check := FALSE;
+END IF;
+
+END LOOP;
+IF v_check THEN
+DBMS_OUTPUT.PUT_LINE('переход будет');
+ELSE
+DBMS_OUTPUT.PUT_LINE('перехода НЕ будет');
+END IF;
+--------------------------------------------------------------------------------
+-----------цикл определения БЛИЖАЙШЕЙ точки к текущему положению, при условии,
+--что движемся на запад (W)
+FOR i IN my_points_table.FIRST..my_points_table.LAST
+LOOP
+IF my_points_table(i).pid <> v_start_point.pid AND
+my_points_table(i).Y = v_start_point.Y AND my_points_table(i).X > v_min.X AND
+my_points_table(i).X < v_start_point.X THEN
+v_min := my_points_table(i);
+END IF;
+END LOOP;
+--------------------------------------------------------------------------------
+IF v_check THEN
+DBMS_OUTPUT.PUT('№ '||v_start_point.pid||' в напр. '||v_direct);
+DBMS_OUTPUT.PUT_LINE(' -> № '||v_min.pid);
+v_start:=v_min;
+ELSE
+DBMS_OUTPUT.PUT_LINE('точек в указаннном направлении не обнаружено');
+END IF;
+END IF;
+
+ END detect_near;
+
+PROCEDURE redirect
+(v_direct IN OUT VARCHAR2,
+ v_pass IN NUMBER)
+IS
+BEGIN
+IF v_pass=0 THEN
+
+  IF v_direct='N' THEN
+    v_direct:='E';
+  ELSIF v_direct='E' THEN
+    v_direct:='S';
+  ELSIF v_direct='S' THEN
+    v_direct:='W';
+  ELSIF v_direct='W' THEN
+   v_direct:='N';
+  END IF;
+
+ELSIF v_pass=1 THEN
+
+  IF v_direct='N' THEN
+    v_direct:='W';
+    ELSIF v_direct='E' THEN
+    v_direct:='N';
+    ELSIF v_direct='S' THEN
+    v_direct:='E';
+    ELSIF v_direct='W' THEN
+    v_direct:='S';
+  END IF;
+
+ELSIF v_pass=2 THEN
+
+  IF v_direct='N' THEN
+    v_direct:='S';
+    ELSIF v_direct='E' THEN
+    v_direct:='W';
+    ELSIF v_direct='S' THEN
+    v_direct:='N';
+    ELSIF v_direct='W' THEN
+    v_direct:='E';
+  END IF;
+END IF;
+END redirect;
+
+PROCEDURE search
+(v_start IN OUT points%ROWTYPE,
+ v_direct IN OUT VARCHAR2,
+ v_count IN NUMBER) IS--v_count-заданное количество точек
+ ---------------------local variable declarations(begin)------------------------
+ v_check BOOLEAN:=FALSE;--результат обнаружения точки в каком-либо направлении
+ 
+--выходящих из вершины(т.е. повороты направо и налево в каждой точке)
+--при каждом проходе через вершину, v_pass увеличивается на единицу
+v_check_PID BOOLEAN:=FALSE;--переменная для контроля за тем, что бы в одну и
+--ту же точку не заходили более одного раза
+  TYPE n_pt_rec IS RECORD
+  (v_PID NUMBER,
+   v_X NUMBER,
+   v_Y NUMBER,
+   v_pass_rec NUMBER);--v_pass_rec характеризует обработку ветвей(правой и левой),
+   --выходящих из вершины(т.е. повороты направо и налево в каждой точке)
+   --при каждом проходе через вершину, v_pass_rec увеличивается на единицу
+   v_myrec n_pt_rec;--переменная типа запись, хранит PID, координаты точки
+   --и характеристику, сколько раз её анализировали
+  TYPE n_table_type IS TABLE OF 
+      n_pt_rec INDEX BY PLS_INTEGER;
+  my_n_table n_table_type;--индексная таблица с точками, через которые прошли
+   ---------------------local variable declarations(end)------------------------
+ BEGIN
+ my_n_table(1).v_PID := 0;--чтобы можно было зацепиться за этот индекс
+                          --с помощью метода LAST
+ my_n_table(1).v_pass_rec := 0;
+ my_n_table(1).v_X:=0;    --технический элемент таблицы
+ my_n_table(1).v_Y:=0;
+ 
+ my_n_table(2).v_PID := v_start.PID;--кладём исходную  точку в таблицу
+ my_n_table(2).v_pass_rec := 0;
+ my_n_table(2).v_X:=v_start.X;
+ my_n_table(2).v_Y:=v_start.Y;
+  LOOP
+  
+      IF my_n_table.COUNT=v_count+1 THEN
+        DBMS_OUTPUT.PUT_LINE('ПУТЬ НАЙДЕН');
+        EXIT;
+      ELSIF my_n_table(my_n_table.LAST).v_PID=0 THEN
+        DBMS_OUTPUT.PUT_LINE('ПУТЬ НЕ НАЙДЕН');
+        EXIT;
+      END IF;
+  
+  
+  
+  IF my_n_table(my_n_table.LAST).v_pass_rec < 2 THEN--условие, что точка
+  --не тупик (тупик-если обе ветви тупиковые(v_pass:=2),
+  --поворотов направо и налево нет)
+  
+     detect_near(v_start, v_direct, v_check, my_points_table);--процедура
+                        --по обнаружению ближайшей точки в заданном направлении
+         
+         v_check_PID:=FALSE;--установка FALSE для каждых последующих проверок
+         
+     FOR i IN my_n_table.FIRST..my_n_table.LAST LOOP--проверяем наличие
+     --в индексной таблице пройденных точек, значение PID точки, полученное
+     --в результате работы процедуры detect_near
+            IF my_n_table(i).v_PID=v_start.PID THEN
+               v_check_PID:=TRUE;--такая точка уже есть
+             --DBMS_OUTPUT.PUT_LINE('ТАКАЯ ТОЧКА УЖЕ ЕСТЬ');
+             --DBMS_OUTPUT.PUT_LINE('LAST '||my_n_table(my_n_table.LAST).v_PID); 
+               EXIT;
+             --ELSE
+             --v_check_PID:=FALSE;
+             --DBMS_OUTPUT.PUT_LINE('НОВАЯ  ТОЧКА');
+               END IF;
+     END LOOP;
+                 
+     IF v_check_PID THEN--если точка в таблице пройденных есть
+          IF v_start.PID<>my_n_table(my_n_table.LAST).v_PID THEN--и если
+          --полученная точка, не последняя в таблице(т.е. она сама,
+          --т.е. это не первый левый поворот)
+             v_start.PID:=my_n_table(my_n_table.LAST).v_PID;--откатываемся
+                                                            --на точку назад
+             v_start.X:=my_n_table(my_n_table.LAST).v_X;
+             v_start.Y:=my_n_table(my_n_table.LAST).v_Y;
+             v_check:=FALSE;--скажем, что  там точки нет(т.к. она не новая)
+             --DBMS_OUTPUT.PUT_LINE('тек.направл. '||v_direct||' тек.тчк '||
+             --v_start.PID||' v_pass '||my_n_table(my_n_table.LAST).v_pass_rec);
+          END IF;
+     ELSE--если такой точки нет, помещаем её в таблицу      
+            my_n_table(my_n_table.LAST+1).v_PID:=v_start.PID;
+            my_n_table(my_n_table.LAST).v_X:=v_start.X;
+            my_n_table(my_n_table.LAST).v_Y:=v_start.Y;
+            my_n_table(my_n_table.LAST).v_pass_rec:=0;           
+     END IF;
+         
+          IF v_check THEN--условие существования точек в заданном направлении
+             redirect(v_direct, my_n_table(my_n_table.LAST).v_pass_rec);
+                                  --поворот направо,(в точке в которую пришли
+                                  --с помощью процедуры detect_near)
+                                  --относительно текущего направления
+          ELSE
+            my_n_table(my_n_table.LAST).v_pass_rec:=my_n_table(my_n_table.LAST).v_pass_rec+1;
+            redirect(v_direct, my_n_table(my_n_table.LAST).v_pass_rec);--два поворота,
+                                            --так как один направо уже был
+            redirect(v_direct, my_n_table(my_n_table.LAST).v_pass_rec);--поворот налево,
+                                  --(всё в той же точке, пока
+                                  --никуда не ушли), после "неудачного" поворота
+                                  --направо
+--DBMS_OUTPUT.PUT_LINE(' нов.напр. '||v_direct||' тек.тчк '||v_start.PID||
+--' v_pass '||my_n_table(my_n_table.LAST).v_pass_rec);
+          END IF;
+    ELSE
+      --DBMS_OUTPUT.PUT_LINE('ПОКА В ТУПИКЕ');
+      my_n_table.DELETE(my_n_table.LAST);
+      v_start.PID:=my_n_table(my_n_table.LAST).v_PID;--откатываемся на точку назад
+      v_start.X:=my_n_table(my_n_table.LAST).v_X;
+      v_start.Y:=my_n_table(my_n_table.LAST).v_Y;
+      my_n_table(my_n_table.LAST).v_pass_rec:=my_n_table(my_n_table.LAST).v_pass_rec+1;--и отмечаем одну веть как тупиковую
+      IF my_n_table(my_n_table.LAST).v_pass_rec=1 THEN
+      redirect(v_direct, my_n_table(my_n_table.LAST).v_pass_rec);--один поворот налево
+      ELSIF my_n_table(my_n_table.LAST).v_pass_rec=2 THEN
+      redirect(v_direct, 0);--один поворот направо
+      END IF;
+      --DBMS_OUTPUT.PUT_LINE('НАПРАВЛ. '||v_direct);
+      --EXIT;
+    END IF; 
+  END LOOP;
+  -------------------------вывод искомого пути----------------------------------
+ DBMS_OUTPUT.PUT_LINE('PID TRAVELED');
+ DBMS_OUTPUT.PUT_LINE('------------');
+ FOR i IN my_n_table.FIRST+1..my_n_table.LAST LOOP--первый технический
+ DBMS_OUTPUT.PUT_LINE('PID '||my_n_table(i).v_PID||' ПОВОРОТ(0-НАПРАВО, 1-НАЛЕВО) '||my_n_table(i).v_pass_rec);
+ END LOOP;
+ END search;
+-------------------------------------------------------------------------------- 
+------------------------[BEGIN initialization statements]-----------------------
+BEGIN
+OPEN c_points_cursor;-------------открыли курсор--------------------------
+LOOP
+FETCH c_points_cursor INTO my_points_table(v_cur_i);--------извлечение-------
+EXIT WHEN c_points_cursor%NOTFOUND;
+v_cur_i:=v_cur_i+1;
+END LOOP;
+CLOSE c_points_cursor;-----------закрыли курсор---------------------------
+END moving;
