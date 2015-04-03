@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>GamePart</title>
+	<script type="text/javascript" src="../Script/Kit.js"></script>
+	<script type="text/javascript">
+		//способ создания объекта (функция-прототип)
+		function Trace(posX, posY)//объекты-следы которые оставляют объекты-фигуры на холсте, вокруг следов вращаются объекты Dot
+			//за которыми следуют объекты triangle
+		{
+			this.posX = posX;
+			this.posY = posY;
+			this.dot = new Dot();
+			this.guardID = [0, 0];//кем охраняется данный объект
+			this.guarded = 0;//0-неохраняемая, 1-один охранник, 2-два охранника,
+			//максимальное число охранников - два (в контексте следа объекта Info)
+		}
+		function Dot()
+		{
+			this.pos = { x: 0, y: 0 };
+			this.radius = 40;//distance from number(цифра на игровом поле)
+			this.angle = 0;//revolving angle
+			this.rotDir = 1;//rotate direction (1 = clockwise)
+			this.speed = Math.PI / 40;//absolute angular speed (абсолютная угловая скорость)
+			this.calcNewPos = function (infPosX, infPosY)
+			{
+				this.angle += this.rotDir * this.speed;
+				this.pos.x = infPosX + this.radius * Math.cos(this.angle);
+				this.pos.y = infPosY + this.radius * Math.sin(this.angle);
+			}
+			this.switchRotation = function ()
+			{
+				this.rotDir = -this.rotDir;
+				this.angle += Math.PI;
+			}
+		}
+		function Info(canvas, posX, posY, number)
+		{
+			this.posX = posX;
+			this.posY = posY;
+			this.number = number;
+			this.canvas = canvas;
+			this.showImage = function ()
+			{
+				var ctx = this.canvas.getContext("2d");
+				ctx.fillStyle = "white";
+				ctx.font = "18px Verdana";
+				ctx.fillText(this.number, this.posX - 7, this.posY + 10);
+			}
+		}
+		function X(canvas, posX, posY, length)
+		{
+			this.posX = posX;
+			this.posY = posY;
+			this.length = length;
+			this.angle = 0;
+			this.canvas = canvas;
+			this.showImage = function ()
+			{
+				var ctx = this.canvas.getContext("2d");//получим контекст
+				ctx.fillStyle = "#c7ae89";
+				ctx.fillRect(this.posX - this.length / 2 - 2, this.posY - this.length / 2 - 2, this.length + 4, this.length + 4);//"закрасим" изображение объекта на холсте
+
+				ctx.save();
+
+				ctx.translate(this.posX, this.posY);
+				ctx.rotate(this.angle);
+				ctx.translate(-this.posX, -this.posY);
+				//+++++++++++++++рисуем x+++++++++++++++
+				ctx.lineWidth = "5";
+				ctx.beginPath();
+				ctx.strokeStyle = "black";
+				ctx.moveTo(this.posX - this.length / 2, this.posY);
+				ctx.lineTo(this.posX + this.length / 2, this.posY);
+				ctx.moveTo(this.posX, this.posY - this.length / 2);
+				ctx.lineTo(this.posX, this.posY + this.length / 2);
+				ctx.stroke();
+				//++++++++++++++++++++++++++++++++++++++
+
+				ctx.restore();
+			};
+		}
+		function Obj(canvas, posX, posY, metric, entity, smart)
+		{
+			this.canvas = canvas;//холст
+			this.ctx = canvas.getContext("2d");
+			this.posX = posX;//координата
+			this.posY = posY;//координата
+			this.entity = entity;//сущность
+			this.smart = smart;//"прыткость" circle-а
+			this.hold = false;//режим захвата объекта мышью с целью внешнего управления
+			this.radius = 0;
+			this.side = 0;
+			this.guardID = 0;//ID охранника объекта Info, в случае если сущность объекта Obj triangle
+
+				switch (entity)
+			{
+				case "circle":
+					this.radius = metric;
+					break;
+				case "square":
+					this.side = 2 * metric;
+					break;
+				case "triangle":
+					this.side = 2 * metric;
+					break;
+			}
+			this.showImage = function ()
+			{
+				switch (this.entity)
+				{
+					case "circle":
+						this.ctx.beginPath();
+						this.ctx.fillStyle = "blue";
+						this.ctx.moveTo(posX, posY);
+						this.ctx.arc(this.posX, this.posY, this.radius / 2, 0, 2 * Math.PI, true);
+						this.ctx.fill();
+						//ctx.closePath();
+						this.ctx.strokeStyle = "blue";
+						this.ctx.lineWidth = 1;
+						this.ctx.moveTo(this.posX, this.posY);
+						this.ctx.beginPath();
+						this.ctx.arc(this.posX, this.posY, this.radius, 0, 2 * Math.PI, true);
+						this.ctx.stroke();
+						//ctx.closePath();
+						break;
+					case "triangle":
+						this.ctx.fillStyle = "yellow";
+						this.ctx.moveTo(this.posX - this.side / 2, this.posY - this.side / 4);
+						this.ctx.beginPath();
+						this.ctx.lineTo(this.posX + this.side / 2, this.posY - this.side / 4);
+						this.ctx.lineTo(this.posX, this.posY + this.side / 4);
+						this.ctx.lineTo(this.posX - this.side / 2, this.posY - this.side / 4);
+						this.ctx.fill();
+						break;
+					case "square":
+						//this.ctx.fillStyle = "red";
+						this.ctx.strokeStyle = "red";
+						this.ctx.beginPath();
+						this.ctx.rect(this.posX - this.side / 2, this.posY - this.side / 2, this.side, this.side);
+						this.ctx.stroke();
+						//this.ctx.fill();
+						break;
+				}
+			};
+			this.outerControl = function ()
+			{
+				this.hold = true;//объект захвачен
+			};
+
+			this.guarding = function (i)
+			{
+				//определяем координаты следа объекта, который будем охранять
+				var locPosX = this.canvas.infoTraces[i].posX;
+				var locPosY = this.canvas.infoTraces[i].posY;
+				//определяем координаты цели
+				this.canvas.infoTraces[i].dot.calcNewPos(locPosX, locPosY);
+				//определяем угол до цели
+				var alpha = Math.atan2(this.posY - this.canvas.infoTraces[i].dot.pos.y, this.canvas.infoTraces[i].dot.pos.x - this.posX);
+				//определяем свои будущие координаты
+				this.posX += 3 * Math.cos(alpha);
+				this.posY -= 3 * Math.sin(alpha);
+			};
+			//++++++++++++++++++++++++++++++++++++++++++++++++++
+			this.detecting = function ()
+			{//обнаружение объектом других объектов, которые он способен обнаружить
+				switch (this.entity)
+				{
+					case "circle":
+						//круг "видит" цифры
+						//нет ли около меня "цифры"
+						//var locTraces = this.canvas.infoTraces;
+						var coord = this.canvas.infos;
+						for (var i = 0; i < coord.length; i++)
+						{
+							if (this.posX > coord[i].posX - 7 && this.posX < coord[i].posX + 7 && this.posY > coord[i].posY - 7 && this.posY < coord[i].posY + 7)
+							{//нашёл "цифру", "усваиваю"
+								var accum = document.getElementById("interpet0");
+								accum.innerHTML += coord[i].number;
+								if (accum.innerHTML.length == 4)
+								{
+									var intValue = parseInt(accum.innerHTML, 10);
+									accum.innerHTML = "";
+									var figure = this.canvas.player;
+									if (intValue % 2 != 0)
+									{
+										for (var i = 0; i < this.canvas.player.length; i++)
+										{
+											if (figure[i].entity == "square")
+											{
+												figure[i].entity = "circle";
+												break;
+											}
+										}									
+									}
+								}
+								//обновим массив с "цифрами", "удалением" "усвоенной" цифры, поместим случайную  цифру в случайной месте
+								coord[i].posX = Math.floor(Math.random() * (canvas.width - 20) + 20);
+								coord[i].posY = Math.floor(Math.random() * (canvas.height - 20) + 20);
+								coord[i].number = Math.floor(Math.random() * 10);
+								//и массив следов
+								this.canvas.infoTraces[i].posX = coord[i].posX;
+								this.canvas.infoTraces[i].posY = coord[i].posY;
+							}
+						}
+						break;
+					case "triangle":
+						//треугольник "видит" круг
+						//проверим не "встретились" ли мы с "отставшим" объектом circle
+						var traceX = this.canvas.sequor.seqPosX;
+						var traceY = this.canvas.sequor.seqPosY;
+
+						if (this.posX > traceX - 7 && this.posX < traceX + 7 && this.posY > traceY - 7 && this.posY < traceY + 7)
+						{//мы напали на след, поищем нет ли рядом объекта
+							//найдем тот circle в игровой структруре из пяти шаров, который отстал
+							for (var i = 0; i < this.canvas.player.length; i++)
+							{
+								if (this.posX > this.canvas.player[i].posX - 7 && this.posX < this.canvas.player[i].posX + 7 && this.posY > this.canvas.player[i].posY - 7 && this.posY < this.canvas.player[i].posY + 7)
+								{
+									this.canvas.player[i].entity = "square";//другое имя
+									this.canvas.player[i].side = 2 * this.canvas.player[i].radius;//"изменённая" сущность
+									break;
+								}
+							}
+							//проверим, не все ли стали квадратами
+							var count = 0;//число квадратов в структуре
+							for (var i = 0; i < this.canvas.player.length; i++)
+							{
+								if (this.canvas.player[i].entity == "square")
+								{
+									count++;
+								}
+							}
+							if (count == 5)
+							{
+								canvas.acting = !canvas.acting;
+								clearInterval(canvas.timerX);
+								clearInterval(canvas.timerTriangle);
+								clearInterval(canvas.timerSwitch);
+								clearInterval(canvas.timerRegroup);
+								this.ctx.fillStyle = "white";
+								this.ctx.font = "36px Verdana";
+								this.ctx.fillText("GAME OVER", 220, 240);
+							}
+						}
+						break;
+					case "square":
+						break;
+				}
+			};
+			//----------------------------Obj moving-----------
+			this.moving = function (e)
+			{
+				switch (this.entity)
+				{
+					case "circle":
+						if (this.hold)//если объект захвачен
+						{
+							//"ведущий" круг обнаруживает "числа"
+							this.detecting();
+							this.canvas.sequor.seqPosX = this.posX;
+							this.canvas.sequor.seqPosY = this.posY;//оставим след для ведомого позади
+							this.posX = e.clientX;
+							this.posY = e.clientY;//следуем за мышью
+						} else
+						{//если ведомый объект
+							var forSwapX = this.posX;
+							var forSwapY = this.posY;
+
+							//"сядем на хвост" ведущему, определим "примерно" где он
+							//вычислим угол до него
+							var alpha = Math.atan2(this.posY - canvas.sequor.seqPosY, canvas.sequor.seqPosX - this.posX);
+							//сформируем новые координаты, шагнув по направлению к ведущему
+							this.posX += smart * Math.cos(alpha);
+							this.posY -= smart * Math.sin(alpha);
+
+							this.canvas.sequor.seqPosX = forSwapX;
+							this.canvas.sequor.seqPosY = forSwapY;//оставим след для ведомого позади
+						}
+						break;
+					case "triangle":
+						//каждый triangle проверяет управляется ли структура(игровой элемент из пяти circle-ов) извне
+						if (this.canvas.object_hold)//если true, то игровой элемент управляется извне
+						{
+							this.detecting();
+							//"сядем на хвост" игровому элементу, определим "примерно" где он
+							//вычислим угол до цели
+							var alpha = Math.atan2(this.posY - canvas.sequor.seqPosY, canvas.sequor.seqPosX - this.posX);
+							//сформируем новые координаты, шагнув по направлению к цели
+							//имитрируем кучность, за счёт внесения случайности в определение координат цели
+							var signX = Math.floor(Math.random()) > 0 ? 1 : -1;
+							var signY = Math.floor(Math.random()) > 0 ? 1 : -1;
+							this.posX += Math.cos(alpha) + signX * Math.floor(Math.random() * 2);
+							this.posY -= Math.sin(alpha) + signY * Math.floor(Math.random() * 2);
+						} else
+						{
+							//если игровой элемент замер, triangle-ы его не "видят" и начинают "дрейфовать" около "информации"
+							for (var i = 0; i < 10; i++)
+							{
+								if (this.canvas.infoTraces[i].guarded < 1)
+								{//нет охранников
+									//запоминаем себя первым охранником данного объекта через его след
+									this.canvas.infoTraces[i].guardID[0] = this.guardID;
+									//изменяем количество охранников данного объекта
+									this.canvas.infoTraces[i].guarded++;
+									//работаем с объектом
+									this.guarding(i);
+									break;
+								} else if (this.canvas.infoTraces[i].guarded < 2)
+								{//один охранник
+									//проверяем не мы ли этот охранник
+									if (this.canvas.infoTraces[i].guardID[0] == this.guardID)
+									{//мы и есть этот охранник
+										this.guarding(i);
+										break;
+									} else
+									{//мы первым охранником не являемся, станем вторым
+										//запоминаем себя вторым охранником данного объекта через его след
+										this.canvas.infoTraces[i].guardID[1] = this.guardID;
+										//изменяем количество охранников данного объекта
+										this.canvas.infoTraces[i].guarded++;
+										this.guarding(i);
+										break;
+									}
+								} else
+								{//два охранника
+									//проверяем не мы ли один из охранников
+									if (this.canvas.infoTraces[i].guardID[0] == this.guardID || this.canvas.infoTraces[i].guardID[1] == this.guardID)
+									{//мы один из охранников
+										this.guarding(i);
+										break;
+									}//если мы не охранники, а их уже два, не обращаем внимания на этот объект
+								}
+							}
+						}
+						break;
+					case "square":
+						var forSwapX = this.posX;
+						var forSwapY = this.posY;
+						//"сядем на хвост" ведущему, определим "примерно" где он
+						//вычислим угол до него
+						var alpha = Math.atan2(this.posY - canvas.sequor.seqPosY, canvas.sequor.seqPosX - this.posX);
+						//сформируем новые координаты, шагнув по направлению к ведущему
+						this.posX += smart * Math.cos(alpha);
+						this.posY -= smart * Math.sin(alpha);
+						this.canvas.sequor.seqPosX = forSwapX;
+						this.canvas.sequor.seqPosY = forSwapY;//оставим след для ведомого позади
+						break;
+				}
+			};
+			this.release = function ()
+			{
+				this.hold = false;//освобождение объекта
+			};
+		}
+		function Init()
+		{
+			var style = "background-color:#e3e371;position:absolute;posWidth:320;posHeight:120;posLeft:700;posTop:10;";
+			var interpret = Append("div", document.body, null, style);
+			interpret.innerHTML = "";
+			interpret["id"] = "interpet0";
+			style = "background-color:#000000;position:absolute;";
+			var canvas = Append("canvas", document.body, null, style);
+			canvas.width = 640;
+			canvas.height = 480;
+			var ctx = canvas.getContext("2d");
+			canvas["showImage"] = function ()//метод, демонстрирующий холст
+			{
+				ctx.fillStyle = "#c7ae89";
+				ctx.fillRect(0, 0, canvas.width, canvas.height);
+			};
+			canvas["object_hold"] = false;//сигнализатор о том, что мышь захватила объект
+
+			//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+			//------------------------объекты вследствие своей активности на холсте оставляют свои следы-------------------
+			canvas["sequor"] = { seqPosX: 0, seqPosY: 0 };//здесь хранятся координаты (следа на холсте)
+			//ведущего, чтобы ведомый знал куда идти
+			canvas["xTraces"];//следы X-ов на холсте
+			canvas["triangleTraces"];//следы triangle-ов на холсте
+			canvas["infoTraces"] = new Array(10);//следы цифр на холсте
+			canvas["showUniverse"] = function (e)
+			{
+				canvas.showImage();//покажем холст
+
+				for (var i = 0; i < array.length; i++)//покажем X-ы
+				{
+					array[i].showImage();
+				}
+				for (var i = 0; i < triangles.length; i++)//покажем triangles
+				{
+					triangles[i].showImage();
+				}
+
+				for (var i = 0; i < status.length; i++)
+				{
+					status[i].showImage();//покажем структуру (игровой элемент)
+				}
+
+				for (var i = 0; i < informatio.length; i++)
+				{
+					informatio[i].showImage();
+				}
+			};
+			canvas["timerX"] = null;
+			canvas["timerTriangle"] = null;
+			canvas["timerRegroup"] = null;
+			canvas["timerSwitch"] = null;//переключатель направления вращения точки вокруг "цифры"
+			canvas["acting"] = false;
+			//++++++++++++++++++++++++++++++++++++++обработчики canvas-а+++++++++++++++++++++++++++++++++++++++++++++++++++
+			//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+			canvas.onmousedown = function (e)
+			{
+				if (canvas.acting)
+				{
+					for (var i = 0; i < status.length; i++)
+					{
+						if (((e.clientX > (status[i].posX - status[i].radius)) && (e.clientX < (status[i].posX + status[i].radius))) && ((e.clientY > (status[i].posY - status[i].radius)) && (e.clientY < (status[i].posY + status[i].radius))))
+						{
+							status[i].outerControl(e);//пометим объект, как контролируемый извне
+							canvas.object_hold = true;
+							break;
+						}
+					}		
+				}
+				e.returnValue = true;
+			};
+			//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+			canvas.onmousemove = function (e)
+			{
+				if (canvas.acting)
+				{
+					if (canvas.object_hold)
+					{
+						//------------------------------движение структуры(игрового элемента)-------------------------
+						for (var i = 0; i < status.length; i++)
+						{
+							if (status[i].hold)//находим ведущего
+							{
+								status[i].moving(e);
+								break;
+							}
+						}
+						for (var i = 0; i < status.length; i++)
+						{
+							if (!status[i].hold)//работаем с ведомыми
+							{
+								status[i].moving(e);
+							}
+						}
+						canvas.showUniverse(e);
+						//-----------------------------------------------------------------------------------------
+						//------------если движется структура, двигаются и triangle-ы по направлению к структуре---
+						for (var i = 0; i < triangles.length; i++)
+						{
+							triangles[i].moving(e);
+						}
+					}
+				}
+				e.returnValue = true;
+			};
+			//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+			canvas.onmouseup = function (e)
+			{
+				if (canvas.acting)
+				{
+					if (canvas.object_hold)
+					{
+						var distance = 1;
+						//зададим центру фигуры координвты мыши
+						status[2].posX = e.clientX;
+						status[2].posY = e.clientY;
+						canvas.timerRegroup = setInterval(function ()
+						{
+							status.regroup(distance);
+							distance++;
+							canvas.showUniverse(e);
+							if (distance > 20)
+							{
+								clearInterval(canvas.timerRegroup);
+							}
+						}, 50);
+						for (var i = 0; i < status.length; i++)
+						{
+							if (status[i].hold)
+							{
+								status[i].release();//освобождение объекта
+								break;
+							}
+						}
+						canvas.object_hold = false;
+					}
+				}
+				e.returnValue = true;
+			}
+			//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+			//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+			//++++++++++++++++++++разворачивание холста и первоначальное размещение объектов на холсте++++++++++++++++++++++++++++++++
+			//-----------------------------------------холст-----------------------------------
+			canvas.showImage();//покажем холст
+			//--------------------------------------------------------------------------------
+			//--------------------------------status (игровой элемент)-----------------------
+			var status = [
+				new Obj(canvas, 10, 10, 10, "circle", 5),
+				new Obj(canvas, 50, 10, 10, "circle", 4),
+				new Obj(canvas, 30, 30, 10, "circle", 3),
+				new Obj(canvas, 10, 50, 10, "circle", 2),
+				new Obj(canvas, 50, 50, 10, "circle", 1)
+			];
+			canvas.player = status;//с помощью свойства player объекта canvas можем получать доступ к объекту, представляющему собой
+														 //группу из пяти шаров
+			status["regroup"] = function (distance)
+			{//структура восстанавливает исходное состояние
+				//[2] возьмёт координаты мыши, где сбрасывается "кучка"
+				status[2].posX;
+				status[2].posY;
+				status[0].posX = status[2].posX - distance;
+				status[0].posY = status[2].posY - distance;
+				status[1].posX = status[2].posX + distance;
+				status[1].posY = status[2].posY - distance;
+				status[3].posX = status[2].posX - distance;
+				status[3].posY = status[2].posY + distance;
+				status[4].posX = status[2].posX + distance;
+				status[4].posY = status[2].posY + distance;
+			};
+			for (var i = 0; i < status.length; i++)//покажем структуру(управляемый элемент)
+			{
+				status[i].showImage();
+			}
+			//----------------------------------------------------------------------------------
+			//------------------------------------X-ы------------------------------------------
+			var array = new Array(20);
+			var xLength = 20;
+
+			for (var i = 0; i < array.length; i++)//создадим X-ы
+			{
+				var locPosX = Math.floor(Math.random() * (canvas.width - 2 * xLength) + xLength);
+				var locPosY = Math.floor(Math.random() * (canvas.height - 2 * xLength) + xLength);
+				array[i] = new X(canvas, locPosX, locPosY, xLength);
+			}
+			for (var i = 0; i < array.length; i++)
+			{
+				array[i].showImage();//покажем X-ы на холсте
+			}
+			//----------------------------------------------------------------------------------
+			//------------------------------------triangle-ы-----------------------------------
+			var triangles = new Array(20);
+			var newID = 0;//переменная для выдачи ID для triangle
+
+			for (var i = 0; i < triangles.length; i++)
+			{
+				var locPosX = Math.floor(Math.random() * (canvas.width - 2 * xLength) + xLength);
+				var locPosY = Math.floor(Math.random() * (canvas.height - 2 * xLength) + xLength);
+				triangles[i] = new Obj(canvas, locPosX, locPosY, 7, "triangle");
+
+				newID++;
+				triangles[i].guardID = newID;
+			}
+
+			for (var i = 0; i < triangles.length; i++)
+			{
+				triangles[i].showImage();
+			}
+			//----------------------------------------------------------------------------------
+			//-----------------------------------informatio------------------------------------
+			var informatio = new Array(10);
+			for (var i = 0; i < informatio.length; i++)
+			{
+				var locPosX = Math.floor(Math.random() * (canvas.width - 20) + 20);
+				var locPosY = Math.floor(Math.random() * (canvas.height - 20) + 20);
+				informatio[i] = new Info(canvas, locPosX, locPosY, Math.floor(Math.random() * 10));
+
+				//добавим для каждой цифры след на холсте, чтобы её могли обнаружить triangle-ы
+				canvas.infoTraces[i] = new Trace(locPosX, locPosY);
+			}
+
+			for (var i = 0; i < informatio.length; i++)
+			{
+				informatio[i].showImage();
+			}
+
+			canvas.infos = informatio;//для взаимодействия с кругами и треугольниками
+			//----------------------------------------------------------------------------------
+			//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+			style = "position:absolute;posLeft:700;posTop:480;";
+			var btn = Append("input", document.body, "id=btn;type=button;value=Start;", style);
+			btn.onclick = function ()
+			{
+				canvas.acting = !canvas.acting;
+				if (canvas.acting)
+				{
+					this.value = "Pause";
+					canvas.timerX = setInterval(function ()
+					{
+						for (var i = 0; i < array.length; i++)
+						{
+							array[i].angle += 0.1;
+							array[i].showImage();
+						}
+					}, 50);
+					canvas.timerTriangle = setInterval(function ()
+					{
+						for (var i = 0; i < triangles.length; i++)
+						{
+							triangles[i].moving();
+						}
+						canvas.showUniverse();
+					}, 50);
+					canvas.timerSwitch = setInterval(function ()
+					{
+						for (var i = 0; i < canvas.infoTraces.length; i++)
+						{
+							canvas.infoTraces[i].dot.switchRotation();
+						}
+					}, 3000);
+				} else
+				{
+					this.value = "Start";
+					clearInterval(canvas.timerX);
+					clearInterval(canvas.timerTriangle);
+					clearInterval(canvas.timerSwitch);
+				}
+			}
+			//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+		}
+		window.onload = Init;
+	</script>
+</head>
+<body>
+</body>
+</html>
