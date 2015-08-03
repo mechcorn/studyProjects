@@ -10,3 +10,5 @@ file pl_sql_dop_5_19 contain breadth-first search;
 file sql_7_4 contain a example of hierarchical query in Oracle;
 
 file javascript_gamePart contain a part of game for browser;
+
+files obstCreate_*.cs are a parts of program for  creating optimal binary search tree;
