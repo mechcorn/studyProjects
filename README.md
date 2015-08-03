@@ -11,4 +11,6 @@ file sql_7_4 contain a example of hierarchical query in Oracle;
 
 file javascript_gamePart contain a part of game for browser;
 
-files obstCreate_*.cs are a parts of program for  creating optimal binary search tree;
+files obstCreate_*.cs are a parts of program for  creating optimal binary search tree (excluding obstCreate_preparer_Form1.cs);
+
+file obstCreate_preparer_Form1.cs contain preparing data for format which using obstCreateProgram for creating tree;
