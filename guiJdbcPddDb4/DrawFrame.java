@@ -1,0 +1,615 @@
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
+package GuiJdbcPddDb4;
+
+import java.awt.Color;
+import java.awt.Font;
+import java.awt.event.ActionEvent;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.Random;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import javax.swing.ButtonGroup;
+import javax.swing.GroupLayout;
+import javax.swing.ImageIcon;
+import javax.swing.JOptionPane;
+import javax.swing.JRadioButton;
+import javax.swing.LayoutStyle;
+import javax.swing.SwingUtilities;
+import static javax.swing.WindowConstants.DISPOSE_ON_CLOSE;
+
+/**
+ *
+ * @author aleole
+ */
+public class DrawFrame extends javax.swing.JFrame {
+
+    /**
+     * Creates new form DrawFrame
+     */
+    public DrawFrame(Connection outerConnection, String outerLogin, boolean registered, boolean isInstructor) {
+        con = outerConnection;//получили уже установленное соединение
+        login = outerLogin;//получили логин, под которым зашёл пользователь или null
+        isRegistered = registered;
+        this.isInstructor = isInstructor;
+        initComponents();
+        
+//--------------------------------формируем данные------------------------------
+        answers = new ArrayList<>();
+//------------------------------------------------------------------------------
+        questId = new StringBuilder();
+        answerButtons = new ArrayList<>();
+//--------------------заполняем ticketBox и questionBox-------------------------
+        for(int i = 0; i < 40; i++){
+            ticketBox.addItem(i + 1);
+        }
+        for(int i = 0; i < 20; i++){
+            questionBox.addItem(i + 1);
+        }
+//------------------------------------------------------------------------------
+        ticketBox.addActionListener((ActionEvent e) -> {
+            ticketNumber = (int) ticketBox.getSelectedItem() - 1;
+            updateForNewQuestion();
+        });
+        questionBox.addActionListener((ActionEvent e) -> {
+            questionNumber = (int) questionBox.getSelectedItem() - 1;
+            updateForNewQuestion();
+        });
+        
+        nextButton.setEnabled(false);
+        nextButton.addActionListener((ActionEvent e) -> {
+            nextButton.setEnabled(false);
+            if(isTesting){
+                testIndex++;
+                if(testIndex < questionsQuantity){//количество вопросов в тесте не превышено
+                    ticketBox.setSelectedIndex(ticketNumMass[testIndex]);
+                    questionBox.setSelectedIndex(questionNumMass[testIndex]);
+                }else{//превысили количество вопросов в тесте
+                    isPassed = countWrAns < 3;//не более двух неверных ответов
+                    completeTest();
+                    ticketBox.setSelectedIndex(0);
+                    questionBox.setSelectedIndex(0);
+                }
+            }else{
+//---------------переходим к следующему вопросу текущего билета-----------------
+                //если текущий не двадцатый
+                if(questionNumber < 19){
+                    questionNumber++;
+                }else{
+                    questionNumber = 0;
+                    if(ticketNumber < 39){
+                        ticketNumber++;
+                    }else{
+                        ticketNumber = 0;
+                    }
+                }
+                ticketBox.setSelectedIndex(ticketNumber);
+                questionBox.setSelectedIndex(questionNumber);
+            }
+        });
+        
+        testButton.setEnabled(isRegistered && !isInstructor);
+        testButton.addActionListener((ActionEvent e) -> {
+            nextButton.setEnabled(false);
+            isTesting = true;//переходим в режим теста/марафона
+            //генерируем две последовательности из n неповторяющихся целых чисел от 1 до 40 и от 1 до 20
+            questionsQuantity = 20;
+            generateRandomNumbers(questionsQuantity);//создаём два массива
+            //со случайными номерами билетов и вопросов
+            ticketBox.setSelectedIndex(ticketNumMass[testIndex]);
+            questionBox.setSelectedIndex(questionNumMass[testIndex]);
+//------------------запишем в базу, что тест начался----------------------------
+            if(testId != -1){//тест уже запущен
+                completeTest();
+            }
+            startTest();
+        });
+        updateForNewQuestion();
+    }
+
+    /**
+     * This method is called from within the constructor to initialize the form.
+     * WARNING: Do NOT modify this code. The content of this method is always
+     * regenerated by the Form Editor.
+     */
+    @SuppressWarnings("unchecked")
+    // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
+    private void initComponents() {
+
+        jProgressBar1 = new javax.swing.JProgressBar();
+        nextButton = new javax.swing.JButton();
+        testButton = new javax.swing.JButton();
+        questionBox = new javax.swing.JComboBox();
+        questionLabel = new javax.swing.JLabel();
+        ticketBox = new javax.swing.JComboBox();
+        ticketLabel = new javax.swing.JLabel();
+        questionPictureLabel = new javax.swing.JLabel();
+        jScrollPane1 = new javax.swing.JScrollPane();
+        questionContentLabel = new javax.swing.JTextArea();
+        resultOfAnswerLabel = new javax.swing.JLabel();
+        answersPanel = new javax.swing.JPanel();
+        jScrollPane2 = new javax.swing.JScrollPane();
+        rightAnswerLabel = new javax.swing.JTextArea();
+        loginLabel = new javax.swing.JLabel();
+        modeLabel = new javax.swing.JLabel();
+
+        setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
+        addWindowListener(new java.awt.event.WindowAdapter() {
+            public void windowClosing(java.awt.event.WindowEvent evt) {
+                formWindowClosing(evt);
+            }
+        });
+
+        nextButton.setText("Следующий вопрос");
+
+        testButton.setText("Тест");
+
+        questionLabel.setText("Вопрос №:");
+
+        ticketLabel.setText("Билет №:");
+
+        questionPictureLabel.setText(null);
+
+        questionContentLabel.setColumns(20);
+        questionContentLabel.setRows(5);
+        jScrollPane1.setViewportView(questionContentLabel);
+        questionContentLabel.setFont(new Font("Courier", Font.PLAIN, 13));
+
+        resultOfAnswerLabel.setText("jLabel4");
+
+        answersPanel.setBorder(javax.swing.BorderFactory.createTitledBorder("Варианты ответа"));
+
+        javax.swing.GroupLayout answersPanelLayout = new javax.swing.GroupLayout(answersPanel);
+        answersPanel.setLayout(answersPanelLayout);
+        answersPanelLayout.setHorizontalGroup(
+            answersPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGap(0, 0, Short.MAX_VALUE)
+        );
+        answersPanelLayout.setVerticalGroup(
+            answersPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGap(0, 100, Short.MAX_VALUE)
+        );
+
+        answersPanelLayout2 = answersPanelLayout;
+
+        rightAnswerLabel.setColumns(20);
+        rightAnswerLabel.setRows(5);
+        jScrollPane2.setViewportView(rightAnswerLabel);
+
+        loginLabel.setText(login);
+
+        modeLabel.setText("Режим свободного изучения");
+
+        javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
+        getContentPane().setLayout(layout);
+        layout.setHorizontalGroup(
+            layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(layout.createSequentialGroup()
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                        .addGroup(layout.createSequentialGroup()
+                            .addComponent(resultOfAnswerLabel)
+                            .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                            .addComponent(jScrollPane2))
+                        .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 570, javax.swing.GroupLayout.PREFERRED_SIZE))
+                    .addGroup(layout.createSequentialGroup()
+                        .addContainerGap()
+                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addGroup(layout.createSequentialGroup()
+                                .addComponent(nextButton)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(testButton)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                                .addComponent(ticketLabel)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(ticketBox, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addGap(18, 18, 18)
+                                .addComponent(questionLabel)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(questionBox, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                            .addGroup(layout.createSequentialGroup()
+                                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                                    .addComponent(questionPictureLabel, javax.swing.GroupLayout.PREFERRED_SIZE, 560, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                    .addGroup(layout.createSequentialGroup()
+                                        .addComponent(loginLabel)
+                                        .addGap(18, 18, 18)
+                                        .addComponent(modeLabel)))
+                                .addGap(0, 0, Short.MAX_VALUE))))
+                    .addComponent(answersPanel, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addContainerGap())
+        );
+        layout.setVerticalGroup(
+            layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(layout.createSequentialGroup()
+                .addContainerGap()
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(nextButton)
+                    .addComponent(testButton)
+                    .addComponent(questionBox, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(questionLabel)
+                    .addComponent(ticketBox, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(ticketLabel))
+                .addGap(18, 18, 18)
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(loginLabel)
+                    .addComponent(modeLabel))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(questionPictureLabel, javax.swing.GroupLayout.PREFERRED_SIZE, 210, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(resultOfAnswerLabel)
+                    .addComponent(jScrollPane2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(answersPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+        );
+
+        pack();
+        setLocationRelativeTo(null);
+    }// </editor-fold>//GEN-END:initComponents
+
+    private void formWindowClosing(java.awt.event.WindowEvent evt) {//GEN-FIRST:event_formWindowClosing
+        // TODO add your handling code here:
+        if(testId != -1){
+                    completeTest();
+                }
+    }//GEN-LAST:event_formWindowClosing
+
+    private void updateForNewQuestion(){
+        resultOfAnswerLabel.setText("");
+        rightAnswerLabel.setText("");       
+        t = (int)ticketBox.getSelectedItem();
+        q = (int)questionBox.getSelectedItem();
+        questId.append('t');
+        questId.append(t);
+        questId.append('q');
+        questId.append(q);
+//-----------------запросим очередной вопрос из базы данных---------------------
+        try{
+            prstmtQuest = con.prepareStatement(query);
+            prstmtQuest.setString(1, questId.toString());
+            rs = prstmtQuest.executeQuery();
+            if(rs.next()){
+//---------------------------добавим сам вопрос---------------------------------
+            questionContentLabel.setText(rs.getString("question_content"));
+//-----------------очистим список вариантов ответа на вопрос--------------------
+            answers.clear();
+//---------------------запомним правильный ответ--------------------------------
+            answers.add(new Answer(rs.getString("right_answer"), true));
+            }
+//--------------------добавим картинку к вопросу--------------------------------
+                byte[] imageBytes = rs.getBytes("question_picture");
+                questionPictureLabel
+                        .setIcon(new ImageIcon(imageBytes));
+//------------------------------------------------------------------------------
+                rs.close();
+                prstmtQuest.close();
+        }catch(SQLException ex){
+            System.out.println("Error: " + ex.getMessage());
+        }
+//-----------------удалим предыдущие радиокнопки, если есть---------------------
+            if(answerButtons.size() > 0){
+                    answersPanel.removeAll();
+            }
+//------------------------радиокнопки с вариантами ответов----------------------
+            String wrongAnsQuery = "SELECT question_id, wrong_answer FROM Wrong_answers WHERE question_id='" + questId.toString() + "'";
+//-----------------------------------очищаем------------------------------------
+            questIdForWrAns = questId.toString();
+            questId.delete(0, questId.length());
+//------------------------------------------------------------------------------
+            try{
+                st = con.createStatement();
+                rsWa = st.executeQuery(wrongAnsQuery);
+            
+                while(rsWa.next()){
+                    //добавим неправильные ответы
+                    answers.add(new Answer(rsWa.getString("wrong_answer"),  false));
+                }
+                rsWa.close();
+                st.close();
+            }catch(SQLException ex){
+                System.out.println("Error: " + ex.getMessage());
+            }
+            numberOfAnswers = answers.size();
+            bg = new ButtonGroup();
+//------------------------------------------------------------------------------
+            answerButtons.clear();//очищаем список   
+        GroupLayout.SequentialGroup horSequentialGroup
+                = answersPanelLayout2.createSequentialGroup();       
+        GroupLayout.ParallelGroup horParallelGroup = answersPanelLayout2
+                .createParallelGroup(GroupLayout.Alignment.LEADING);
+        
+        GroupLayout.SequentialGroup verSequentialGroup
+                = answersPanelLayout2.createSequentialGroup();
+        GroupLayout.ParallelGroup verParallelGroup = answersPanelLayout2
+                .createParallelGroup(GroupLayout.Alignment.LEADING);
+//------------------перемешаем варианты ответов на вопрос-----------------------
+        answerNumMass = new int[numberOfAnswers];
+        int number;
+        for(int i = 0; i < numberOfAnswers; i++){
+            answerNumMass[i] = -1;//заполним массив -1
+        }
+        for(int i = 0; i < numberOfAnswers; i++){
+            number = rdm.nextInt(numberOfAnswers);
+            if(isOverlap(answerNumMass, number)){//если случайного числа нет в массиве
+                i--;
+            }else{
+                answerNumMass[i] = number;
+            }
+        }
+//------------------------------------------------------------------------------
+        //далее в цикле добавим радиокнопки в вышеуказанные группы
+            for(int i = 0; i < numberOfAnswers; i++){
+                //укладываем текст варианта ответа на кнопку
+                answerButtons.add(new JRadioButton(answers.get(answerNumMass[i]).getContent()));
+                bg.add(answerButtons.get(i));//добавляем кнопку в группу
+                answerButtons.get(i).addActionListener((ActionEvent e) -> {
+                    Object source = e.getSource();
+//------------------------------------------------------------------------------
+                    for (int i1 = 0; i1 < numberOfAnswers; i1++) {
+                        answerButtons.get(i1).setEnabled(false);
+                        if (source == answerButtons.get(i1)) {
+                            //проверяем правильность текущего ответа
+                            //найдём правильный в источнике
+                            if (answers.get(answerNumMass[i1]).isRight()) {
+                                resultOfAnswerLabel.setForeground(Color.green);
+                                resultOfAnswerLabel.setText("ВЕРНО!");
+                            } else {
+                                resultOfAnswerLabel.setForeground(Color.red);
+                                resultOfAnswerLabel.setText("НЕВЕРНО!");
+                                for(Answer answer : answers){
+                                    if(answer.isRight()){
+                                        rightAnswer = answer.getContent();
+                                        break;
+                                    }
+                                }
+                                if(rightAnswer != null){
+                                    rightAnswerLabel.setText("ПРАВИЛЬНЫЙ ОТВЕТ: " + convertRightAnswer(rightAnswer));
+                                }
+//+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+                                try {
+                                    if (isTesting) {
+                                        prstmtInsWrAns.setString(1, questIdForWrAns);
+                                        prstmtInsWrAns.setInt(2, testId);
+                                        prstmtInsWrAns.setString(3, convertRightAnswer(answers.get(answerNumMass[i1]).getContent()));
+                                        prstmtInsWrAns.execute();
+                                        countWrAns++;
+                                    }
+                                }catch (SQLException ex) {
+                                    System.out.println("Error: " + ex.getMessage());
+                                    Logger.getLogger(DrawFrame.class.getName()).log(Level.SEVERE, null, ex);
+                                }
+//+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+                            }
+                            nextButton.setEnabled(true);
+                        }
+                    }
+//------------------------------------------------------------------------------
+                });//добавляем слушателя
+                //-----------------добавляем кнопки-----------------------------
+                horParallelGroup.addComponent(answerButtons.get(i));//добавляем кнопки...
+                verSequentialGroup.addComponent(answerButtons.get(i));
+                if(i < numberOfAnswers - 1){
+                    verSequentialGroup.addPreferredGap(LayoutStyle.ComponentPlacement.RELATED);
+                }else{
+                    verSequentialGroup.addGap(0, 8, Short.MAX_VALUE);
+                }
+            }
+            //setHorizontalGroup
+            horSequentialGroup.addGroup(horParallelGroup).addGap(0, 0, Short.MAX_VALUE);
+            //setVerticalGroup
+            verParallelGroup.addGroup(verSequentialGroup);
+            answersPanelLayout2.setHorizontalGroup(answersPanelLayout2.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING).addGroup(horSequentialGroup));
+            answersPanelLayout2.setVerticalGroup(verParallelGroup);
+//--------------------------обновим видимое-------------------------------------            
+            SwingUtilities.updateComponentTreeUI(this);//??????????????????????????????????????????????????
+//------------------------------------------------------------------------------
+    }
+    
+    private String convertRightAnswer(String source){
+        return source.replaceAll("<html>", "").replaceAll("<br>", "\n").replaceAll("</html>", "");
+    }
+    
+    private void generateRandomNumbers(int questionsQuantity){
+        ticketNumMass = new int[questionsQuantity];
+        questionNumMass = new int[questionsQuantity];
+        for(int i = 0; i < questionsQuantity; i++){
+            ticketNumMass[i] = rdm.nextInt(40);
+            questionNumMass[i] = rdm.nextInt(20);
+        }
+    }
+    
+    private boolean isOverlap(int[] array, int number){
+        for(int i = 0; i < array.length; i++){
+            if(array[i] == number){
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    final void completeTest(){
+            try {
+                prstmtInsTestRes = con.prepareStatement(updTestRes);
+                prstmtInsTestRes.setTimestamp(1, new Timestamp(new Date().getTime()));
+                prstmtInsTestRes.setBoolean(2, isPassed);
+                prstmtInsTestRes.setInt(3, countWrAns);
+                prstmtInsTestRes.setInt(4, testId);
+                prstmtInsTestRes.execute();
+                prstmtInsTestRes.close();
+//------------------------------------------------------------------------------
+                StringBuilder resSb = new StringBuilder();
+                resSb.append("ТЕСТ ");
+                if(isPassed){
+                    resSb.append("СДАН");
+                }else{
+                    resSb.append("НЕ СДАН");
+                }
+                resSb.append(" Количество неверных ответов: ");
+                resSb.append(countWrAns);
+                JOptionPane.showMessageDialog(
+                        null,
+                        resSb.toString(),
+                        "РЕЗУЛЬТАТЫ",
+                        JOptionPane.INFORMATION_MESSAGE);
+                testId = -1;
+                isPassed = false;
+                isTesting = false;
+                countWrAns = 0;
+                testIndex = 0;
+                modeLabel.setForeground(Color.BLACK);
+                modeLabel.setText("Режим свободного изучения");
+                ticketBox.setEnabled(true);
+                questionBox.setEnabled(true);
+                testButton.setEnabled(true);
+//------------------------------------------------------------------------------
+            } catch (SQLException ex) {
+                System.out.println("Error: " + ex.getMessage());
+                Logger.getLogger(DrawFrame.class.getName()).log(Level.SEVERE, null, ex);
+            }
+    }
+    
+    private void startTest(){
+        testButton.setEnabled(false);
+        ticketBox.setEnabled(false);
+        questionBox.setEnabled(false);
+        modeLabel.setForeground(Color.RED);
+        modeLabel.setText("РЕЖИМ СДАЧИ ТЕСТА!");
+        try {
+//------------------------------------------------------------------------------
+            testId = (int)new Date().getTime();
+//------------------------------------------------------------------------------
+            prstmtInsTestRes = con.prepareStatement(insTestRes);
+            prstmtInsTestRes.setInt(1, testId);
+            prstmtInsTestRes.setString(2, login);
+            prstmtInsTestRes.setTimestamp(3, new Timestamp(new Date().getTime()));
+            prstmtInsTestRes.execute();
+            prstmtInsTestRes.close();
+//--подготовим prstmtInsAns для использования в процессе нажатия на радиокнопок-
+                prstmtInsWrAns = con.prepareStatement(insWrAns);
+//------------------------------------------------------------------------------
+        } catch (SQLException ex) {
+            System.out.println("Error: " + ex.getMessage());
+            Logger.getLogger(DrawFrame.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+    /**
+     * @param args the command line arguments
+     */
+    public static void main(String args[]) {
+        /* Set the Nimbus look and feel */
+        //<editor-fold defaultstate="collapsed" desc=" Look and feel setting code (optional) ">
+        /* If Nimbus (introduced in Java SE 6) is not available, stay with the default look and feel.
+         * For details see http://download.oracle.com/javase/tutorial/uiswing/lookandfeel/plaf.html 
+         */
+        try {
+            for (javax.swing.UIManager.LookAndFeelInfo info : javax.swing.UIManager.getInstalledLookAndFeels()) {
+                if ("Nimbus".equals(info.getName())) {
+                    javax.swing.UIManager.setLookAndFeel(info.getClassName());
+                    break;
+                }
+            }
+        } catch (ClassNotFoundException ex) {
+            java.util.logging.Logger.getLogger(DrawFrame.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
+        } catch (InstantiationException ex) {
+            java.util.logging.Logger.getLogger(DrawFrame.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
+        } catch (IllegalAccessException ex) {
+            java.util.logging.Logger.getLogger(DrawFrame.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
+        } catch (javax.swing.UnsupportedLookAndFeelException ex) {
+            java.util.logging.Logger.getLogger(DrawFrame.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
+        }
+        //</editor-fold>
+
+        /* Create and display the form */
+        java.awt.EventQueue.invokeLater(new Runnable() {
+            public void run() {
+                //new DrawFrame().setVisible(true);
+            }
+        });
+    }
+
+    private GroupLayout answersPanelLayout2;
+    private int numberOfAnswers = -1;//количество вариантов ответа на вопрос
+    private int ticketNumber = 0;//номер билета
+    private int questionNumber = 0;//номер вопроса
+    private final ArrayList<JRadioButton> answerButtons;
+    private ButtonGroup bg;
+    private final Connection con;
+    private String rightAnswer = null;
+    private final ArrayList<Answer> answers;
+    private final StringBuilder questId;
+    private int t, q;//используются для формирования идентификатора вопроса
+    private int[] ticketNumMass;//массив для хранения набора случайных номеров билетов
+    private int[] questionNumMass;//массив для хранения набора случайных номеров вопросов
+    private int[] answerNumMass;//массив для хранения случайной последовательности вариантов ответа на вопрос
+    private boolean isTesting= false;//свободное прохождение или тест/марафон
+    private int testIndex;//индекс элемента массива с билетами и вопросами
+    private int questionsQuantity;//количество вопросов в тесте
+    private final Random rdm = new Random();
+    private boolean isRegistered = false;//режим зарегистрированного пользователя или нет
+    private String login = null;//логин, под которым вошёл пользователь
+    private int testId = -1;
+    private ResultSet rs = null;
+    private ResultSet rsWa = null;
+    private Statement st = null;
+    private PreparedStatement prstmtQuest = null;
+    private PreparedStatement prstmtInsWrAns = null;
+    private String questIdForWrAns = null;
+    private boolean isPassed = false;//маркер сдачи теста
+    private int countWrAns = 0;//количество неверных ответов в тесте
+    private final String query = "SELECT question_id,"
+            + " question_content,"
+            + " right_answer,"
+            + " question_picture"
+            + " FROM Questions"
+            + " WHERE question_id=?";
+    private final String insTestRes = "Insert INTO Passed_tests"
+                                    + " (test_id,"
+                                    + " login,"
+                                    + " start_test_time)"
+                                    + " VALUES(?, ?, ?)";
+    private final String updTestRes = "UPDATE Passed_tests SET"
+                + " (end_test_time,"
+                + " is_passed,"
+                + " quant_wr_ans) = (?, ?, ?)"
+                + " WHERE test_id=?";
+    private PreparedStatement prstmtInsTestRes = null;
+    private final String insWrAns = "INSERT INTO Selected_wr_ans"
+                                    + " (question_id,"
+                                    + " test_id,"
+                                    + " sel_wr_ans)"
+                                    + " VALUES (?, ?, ?)";
+    private boolean isInstructor = false;
+    // Variables declaration - do not modify//GEN-BEGIN:variables
+    private javax.swing.JPanel answersPanel;
+    private javax.swing.JProgressBar jProgressBar1;
+    private javax.swing.JScrollPane jScrollPane1;
+    private javax.swing.JScrollPane jScrollPane2;
+    private javax.swing.JLabel loginLabel;
+    private javax.swing.JLabel modeLabel;
+    private javax.swing.JButton nextButton;
+    private javax.swing.JComboBox questionBox;
+    private javax.swing.JTextArea questionContentLabel;
+    private javax.swing.JLabel questionLabel;
+    private javax.swing.JLabel questionPictureLabel;
+    private javax.swing.JLabel resultOfAnswerLabel;
+    private javax.swing.JTextArea rightAnswerLabel;
+    private javax.swing.JButton testButton;
+    private javax.swing.JComboBox ticketBox;
+    private javax.swing.JLabel ticketLabel;
+    // End of variables declaration//GEN-END:variables
+}
