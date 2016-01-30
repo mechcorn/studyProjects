@@ -14,3 +14,5 @@ file javascript_gamePart contain a part of game for browser;
 files obstCreate_*.cs are a parts of program for  creating optimal binary search tree (excluding obstCreate_preparer_Form1.cs);
 
 file obstCreate_preparer_Form1.cs contain preparing data for format which using obstCreateProgram for creating tree;
+
+guiJdbcPddDb is client-prototype for postgreSQL db, designed for studying pdd rules and passing tests.
